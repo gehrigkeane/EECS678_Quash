@@ -130,36 +130,37 @@ int main(int argc, char** argv) {
 	start();
 	
 	puts("Welcome to Quash!");
-	puts("Type \"exit\" to quit");
+	puts("Type \"exit\" or \"quit\" to leave this shell");
 	print_init();
 
 	// Main execution loop
 	while (is_running() && get_command(&cmd, stdin)) {
 
 		// The commands should be parsed, then executed.
-		if (!strcmp(cmd.cmdstr, "exit") || !strcmp(cmd.cmdstr, "quit"))
+		if (!strcmp(cmd.cmdstr, "exit") || !strcmp(cmd.cmdstr, "quit")) {
 			terminate(); // Exit Quash
+		}
 		else if (!cmd.cmdlen) {
 			print_init();
-			continue; 
+			continue;
 		}
-		else if (strcmp(cmd.tok[0], "cd") == 0) {
+		else if (!strcmp(cmd.tok[0], "cd")) {
 			//TODO: IMPLEMENT CD FUNCTION HERE
 			printf("IMPLEMENT CD FUNCTION\n");
 		}
-		else if (strcmp(cmd.tok[0], "echo") == 0) {
+		else if (!strcmp(cmd.tok[0], "echo")) {
 			//TODO: IMPLEMENT ECHO FUNCTION HERE
 			printf("IMPLEMENT ECHO FUNCTION\n");
 		}
-		else if (strcmp(cmd.tok[0], "jobs") == 0) {
+		else if (!strcmp(cmd.tok[0], "jobs")) {
 			//TODO: IMPLEMENT JOBS FUNCTION HERE
 			printf("IMPLEMENT JOBS FUNCTION\n");
 		}
-		else if (strcmp(cmd.tok[0], "kill") == 0) {
+		else if (!strcmp(cmd.tok[0], "kill")) {
 			//TODO: IMPLEMENT KILL FUNCTION HERE
 			printf("IMPLEMENT KILL FUNCTION\n");
 		}
-		else if (strcmp(cmd.tok[0], "set") == 0) {
+		else if (!strcmp(cmd.tok[0], "set")) {
 			//TODO: IMPLEMENT SET FUNCTION HERE
 			printf("IMPLEMENT SET FUNCTION\n");
 		}
