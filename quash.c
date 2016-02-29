@@ -98,7 +98,6 @@ void print_init() {
 		printf("%s $ ", cwd);
 }
 
-
 /**
 	* Echo Implementation
 	*
@@ -126,7 +125,6 @@ void echo(command_t* cmd)
 	}
 }
 
-
 /**
 	* CD Implementation
 	*
@@ -147,7 +145,6 @@ void cd(command_t* cmd)
 			printf("cd: %s: No such file or directory\n", cmd->tok[1]); 
 	}
 }
-
 
 /**
 	* Set Implementation
