@@ -26,6 +26,8 @@
 #define MAX_COMMAND_LENGTH (1024)
 #define MAX_COMMAND_ARGLEN (32)
 
+#define MAX_NUM_JOBS (100)
+
 /**
 	* Holds information about a command.
 	*/
@@ -41,11 +43,14 @@ typedef struct command_t {
 		// Extend with more fields if needed
 } command_t;
 
+/**
+	* Holds information about a running process (job).
+	*/
 typedef struct job {
-	char* cmdstr;
-	bool status;
-	int pid;
-	int jid;
+	char* cmdstr;							// The command issued for this process
+	bool status;							// Status for this process (running or not)
+	int pid;								// Process ID #
+	int jid;								// Job ID #
 } job;
 
 /**

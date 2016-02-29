@@ -2,7 +2,7 @@
  * @file quash.c
  *
  * Quash's main file
- */
+	*/
 
 /**************************************************************************
  * Included Files
@@ -16,18 +16,22 @@
  **************************************************************************/
 /**
  * Keep track of whether Quash should request another command or not.
- */
+	*/
 // NOTE: "static" causes the "running" variable to only be declared in this
 // compilation unit (this file and all files that include it). This is similar
 // to private in other languages.
 static bool running;
+
+static struct job all_jobs[MAX_NUM_JOBS];
+
+static int num_jobs;
 
 /**************************************************************************
  * Private Functions 
  **************************************************************************/
 /**
  * Start the main loop by setting the running flag to true
- */
+	*/
 static void start() {
 	running = true;
 }
@@ -62,7 +66,7 @@ void unmask_signal(int signal)
 	* @param cmd command struct
 	* @param in instream
 	* @return bool successful parse
- */
+	*/
 bool get_command(command_t* cmd, FILE* in) {
 	if (fgets(cmd->cmdstr, MAX_COMMAND_LENGTH, in) != NULL) {
 		size_t len = strlen(cmd->cmdstr);
@@ -115,7 +119,7 @@ bool get_command(command_t* cmd, FILE* in) {
 	* Print Current Working Directory before shell commands
 	*
 	* @return void
- */
+	*/
 void print_init() {
 	////////////////////////////////////////////////////////////////////////////////
 	// Print Current Working Dir before each command
@@ -130,11 +134,32 @@ void print_init() {
  **************************************************************************/
 
 /**
+	* CD Implementation
+	*
+	* @param cmd command struct
+	* @return void
+	* Note: chdir will make new dir's if they don't exist
+	*/
+void cd(command_t* cmd) 
+{
+	if ( cmd->toklen < 2 ) {
+		if ( chdir(getenv("HOME")) )
+			printf("cd: %s: Cannot navigate to $HOME\n", getenv("HOME"));
+	}
+	else if ( cmd->toklen > 2 )
+		puts("Too many arguments");
+	else { 
+		if ( chdir(cmd->tok[1]) )
+			printf("cd: %s: No such file or directory\n", cmd->tok[1]); 
+	}
+}
+
+/**
 	* Echo Implementation
 	*
 	* @param cmd command struct
 	* @return void
- */
+	*/
 void echo(command_t* cmd) 
 {
 	if ( cmd->toklen == 2 ) {
@@ -157,23 +182,20 @@ void echo(command_t* cmd)
 }
 
 /**
-	* CD Implementation
-	*
-	* @param cmd command struct
+	* Displays all currently running jobs
 	* @return void
-	* Note: chdir will make new dir's if they don't exist
- */
-void cd(command_t* cmd) 
-{
-	if ( cmd->toklen < 2 ) {
-		if ( chdir(getenv("HOME")) )
-			printf("cd: %s: Cannot navigate to $HOME\n", getenv("HOME"));
+	*/
+void jobs(command_t* cmd) {
+	if (cmd->tok[1] == NULL) {
+		int i = 0;
+		for (; i < num_jobs; i++) {
+			if(all_jobs[i].status) {
+				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr->tok[0]); 
+			}
+		}
 	}
-	else if ( cmd->toklen > 2 )
-		puts("Too many arguments");
-	else { 
-		if ( chdir(cmd->tok[1]) )
-			printf("cd: %s: No such file or directory\n", cmd->tok[1]); 
+	else {
+		printf("jobs: Unknown command \"%s\"\n", cmd->tok[1]);
 	}
 }
 
@@ -185,7 +207,7 @@ void cd(command_t* cmd)
 	*
 	* @param cmd command struct
 	* @return void
- */
+	*/
 void set(command_t* cmd) {
 	if (cmd->tok[1] == NULL) {
 		printf("set: No command given\n");
@@ -221,7 +243,7 @@ void set(command_t* cmd) {
 	* @param cmd command struct
 	* @param envp environment variables
 	* @return RETURN_CODE
- */
+	*/
 int exec_command(command_t* cmd, char* envp[])
 {
 	////////////////////////////////////////////////////////////////////////////////
@@ -278,7 +300,7 @@ int exec_command(command_t* cmd, char* envp[])
 	* @param cmd command struct
 	* @param envp environment variables
 	* @return RETURN_CODE
- */
+	*/
 int exec_basic_command(command_t* cmd, char* envp[])
 {
 	////////////////////////////////////////////////////////////////////////////////
@@ -326,8 +348,8 @@ int exec_basic_command(command_t* cmd, char* envp[])
 			exit(EXIT_FAILURE);
 		}
 		exit(EXIT_SUCCESS);
-	}
-}
+
+
 
 /**************************************************************************
  * MAIN
@@ -339,7 +361,7 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	* @param argc argument count from the command line
 	* @param argv argument vector from the command line
 	* @return program exit status
- */
+	*/
 int main(int argc, char** argv, char** envp) { 
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -385,8 +407,7 @@ int main(int argc, char** argv, char** envp) {
 			echo(&cmd);
 		}
 		else if (!strcmp(cmd.tok[0], "jobs")) {
-			//TODO: IMPLEMENT JOBS FUNCTION HERE
-			printf("IMPLEMENT JOBS FUNCTION\n");
+			jobs(&cmd);
 		}
 		else if (!strcmp(cmd.tok[0], "kill")) {
 			//TODO: IMPLEMENT KILL FUNCTION HERE
