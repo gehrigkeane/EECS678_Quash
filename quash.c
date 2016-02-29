@@ -190,7 +190,7 @@ void jobs(command_t* cmd) {
 		int i = 0;
 		for (; i < num_jobs; i++) {
 			if(all_jobs[i].status) {
-				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr->tok[0]); 
+				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr); 
 			}
 		}
 	}
@@ -348,6 +348,8 @@ int exec_basic_command(command_t* cmd, char* envp[])
 			exit(EXIT_FAILURE);
 		}
 		exit(EXIT_SUCCESS);
+	}
+}
 
 
 
