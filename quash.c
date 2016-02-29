@@ -98,6 +98,45 @@ void print_init() {
 		printf("%s $ ", cwd);
 }
 
+
+/**
+	* Echo Implementation
+	*
+	* @param cmd command struct
+	* @return void
+ */
+void echo(command_t* cmd) 
+{
+	if ( cmd->toklen != 1 || strcmp(cmd->tok[1], "$HOME") )
+		puts(getenv("HOME"));
+	else if ( strcmp(cmd->tok[1], "$PATH") )
+		puts(getenv("PATH"));
+	else
+		puts(cmd->tok[1]);
+}
+
+
+/**
+	* CD Implementation
+	*
+	* @param cmd command struct
+	* @return void
+	* Note: chdir will make new dir's if they don't exist
+ */
+void cd(command_t* cmd) 
+{
+	if ( cmd->toklen < 1 ) {
+		if ( chdir(getenv("HOME")) )
+			printf("cd: %s: Cannot navigate to $HOME\n", getenv("HOME"));
+	}
+	else if ( cmd->toklen > 1 )
+		puts("Too many arguments");
+	else { 
+		if ( chdir(cmd->tok[1]) )
+			printf("cd: %s: No such file or directory\n", cmd->tok[1]); 
+	}
+}
+
 /**
 	* Quash entry point
 	*
@@ -144,13 +183,11 @@ int main(int argc, char** argv) {
 			print_init();
 			continue;
 		}
-		else if (!strcmp(cmd.tok[0], "cd")) {
-			//TODO: IMPLEMENT CD FUNCTION HERE
-			printf("IMPLEMENT CD FUNCTION\n");
+		else if (strcmp(cmd.tok[0], "cd") == 0) {
+			cd(&cmd);
 		}
-		else if (!strcmp(cmd.tok[0], "echo")) {
-			//TODO: IMPLEMENT ECHO FUNCTION HERE
-			printf("IMPLEMENT ECHO FUNCTION\n");
+		else if (strcmp(cmd.tok[0], "echo") == 0) {
+			echo(&cmd);
 		}
 		else if (!strcmp(cmd.tok[0], "jobs")) {
 			//TODO: IMPLEMENT JOBS FUNCTION HERE
