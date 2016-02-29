@@ -24,7 +24,7 @@ static bool running;
 
 static struct job all_jobs[MAX_NUM_JOBS];
 
-static int num_jobs;
+static int num_jobs = 0;
 
 /**************************************************************************
  * Private Functions 
@@ -55,7 +55,22 @@ void mask_signal(int signal)
 void unmask_signal(int signal)
 {
 	exit(0); 
-} 
+}
+
+void job_handler(int signal, siginfo_t* siginf, void* slot)
+{
+	pid_t p = siginf->si_pid;
+	int i = 0;
+	for (; i < num_jobs; ++i) {
+		if (all_jobs[i].pid == p)
+			break;
+	}
+	if (i < num_jobs) {
+		printf("[%d] %d finished %s\n", all_jobs[i].jid, p, all_jobs[i].cmdstr); 
+		all_jobs[i].status = true;
+		free(all_jobs[i].cmdstr);
+	}
+}
 /**************************************************************************
  * String Manipulation Functions 
  **************************************************************************/
@@ -126,7 +141,7 @@ void print_init() {
 	////////////////////////////////////////////////////////////////////////////////
 	char cwd[MAX_COMMAND_LENGTH];		//cwd arg - print before each shell command
 	if ( getcwd(cwd, sizeof(cwd)) )
-		printf("%s $ ", cwd);
+		printf("\n[Quash: %s] q$ ", cwd);
 }
 
 /**************************************************************************
@@ -189,14 +204,12 @@ void jobs(command_t* cmd) {
 	if (cmd->tok[1] == NULL) {
 		int i = 0;
 		for (; i < num_jobs; i++) {
-			if(all_jobs[i].status) {
+			if(!all_jobs[i].status)
 				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr); 
-			}
 		}
 	}
-	else {
+	else
 		printf("jobs: Unknown command \"%s\"\n", cmd->tok[1]);
-	}
 }
 
 /**
@@ -277,7 +290,13 @@ int exec_command(command_t* cmd, char* envp[])
 	if ( b_bool ) {
 		cmd->tok[cmd->toklen - 1] = '\0'; // remove & token
 		cmd->toklen--;
+		int i = 0;
+		puts("Struct Token String\n");
+		for (;i <= cmd->toklen; i++) {
+			printf ("%d: %s\n", i, cmd->tok[i]);
+		}
 		//execute background command
+		RETURN_CODE = exec_backg_command(cmd, envp);
 	} 
 	else if ( i_bool ) {
 		RETURN_CODE = exec_redir_command(cmd, true, envp);
@@ -447,6 +466,112 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 	}
 }
 
+/**
+	* Executes any command with an & present 
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
+int exec_backg_command(command_t* cmd, char* envp[])
+{
+	pid_t p;
+	int wait_status;
+	//int file_desc;
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Handle and Initialize Signal Masking
+	////////////////////////////////////////////////////////////////////////////////
+	struct sigaction action;
+	action.sa_sigaction = *job_handler;
+	action.sa_flags = SA_SIGINFO | SA_RESTART;
+	if (sigaction(SIGCHLD, &action, NULL) < 0)
+		fprintf(stderr, "Error background signal handler: ERRNO\"%d\"\n", errno);
+	sigprocmask(SIG_BLOCK, &sigmask_1, &sigmask_2);
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Fork And Verify Process
+	////////////////////////////////////////////////////////////////////////////////
+	p = fork();
+	if (p < 0) {
+		fprintf(stderr, "\nError forking background command. ERRNO\"%d\"\n", errno);
+		exit(EXIT_FAILURE);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Parent
+	////////////////////////////////////////////////////////////////////////////////
+	if (p != 0) {
+		////////////////////////////////////////////////////////////////////////////////
+		// Populate new job struct
+		////////////////////////////////////////////////////////////////////////////////
+		struct job create_job;
+		create_job.cmdstr = (char*) malloc(MAX_COMMAND_TITLE);
+		strcpy(create_job.cmdstr, cmd->tok[0]);
+		create_job.status = false; 
+		create_job.pid = p; 
+		create_job.jid = num_jobs;
+		
+		////////////////////////////////////////////////////////////////////////////////
+		// Augment Global all_jobs struct
+		////////////////////////////////////////////////////////////////////////////////
+		printf("[%d] %d running in background\n", num_jobs, p); 
+		all_jobs[num_jobs] = create_job;
+		num_jobs++;
+
+		////////////////////////////////////////////////////////////////////////////////
+		// Unmask Signals, and Wait for completion
+		////////////////////////////////////////////////////////////////////////////////
+		sigprocmask(SIG_UNBLOCK, &sigmask_1, &sigmask_2);
+		while (waitpid(p, &wait_status, WNOHANG) > 0) {} 
+		return EXIT_SUCCESS;
+
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Child
+	////////////////////////////////////////////////////////////////////////////////
+	else {
+		////////////////////////////////////////////////////////////////////////////////
+		// Map Child Process to different output
+		////////////////////////////////////////////////////////////////////////////////
+/*		char temp_file[MAX_COMMAND_LENGTH];
+		char cpid [MAX_COMMAND_ARGLEN];
+		int ipid = getpid();
+
+		snprintf(cpid, MAX_COMMAND_ARGLEN,"%d",ipid);
+		strcpy(temp_file, cpid);
+		strcat(temp_file, "-temp_output.out");
+
+		file_desc = open(temp_file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+		
+		if (file_desc < 0) {
+			fprintf(stderr, "\nError opening %s. ERRNO\"%d\"\n", temp_file, errno);
+			exit(EXIT_FAILURE);
+		}
+
+		if (dup2(file_desc, STDOUT_FILENO) < 0) {
+			fprintf(stderr, "\nError redirecting STDOUT to %s. ERRNO\"%d\"\n", temp_file, errno);
+			exit(EXIT_FAILURE);
+		}
+*/
+
+		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
+			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
+			exit(EXIT_FAILURE);
+		}
+		else {
+			fprintf(stderr, "Error executing %s. ERRNO\"%d\"\n", cmd->tok[0], errno);
+			exit(EXIT_FAILURE);
+		}
+		signal(SIGINT, unmask_signal);
+		exit(EXIT_SUCCESS);
+	} 
+	
+}
+
+
+
 /**************************************************************************
  * MAIN
  **************************************************************************/
@@ -463,8 +588,8 @@ int main(int argc, char** argv, char** envp) {
 	////////////////////////////////////////////////////////////////////////////////
 	// Init Signal Masking
 	////////////////////////////////////////////////////////////////////////////////
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGCHLD);
+	sigemptyset(&sigmask_1);
+	sigaddset(&sigmask_1, SIGCHLD);
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Input stems from FILE
@@ -520,6 +645,8 @@ int main(int argc, char** argv, char** envp) {
 				printf ("%d: %s\n", i, cmd.tok[i]);
 			}*/
 			exec_command(&cmd, envp);
+			print_init();
+			continue;
 		}
 
 		print_init();

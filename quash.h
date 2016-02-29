@@ -23,8 +23,9 @@
 /**
 	* Specify the maximum number of characters accepted by the command string
 	*/
-#define MAX_COMMAND_LENGTH (1024)
+#define MAX_COMMAND_TITLE (128)
 #define MAX_COMMAND_ARGLEN (32)
+#define MAX_COMMAND_LENGTH (1024)
 
 #define MAX_NUM_JOBS (100)
 
@@ -128,6 +129,16 @@ void mask_signal(int signal);
 void unmask_signal(int signal);
 
 /**
+	* Handles job completion on completion signal
+	*
+	* @param int signal 
+	* @param siginf
+	* @param slot
+	* @return void
+	*/
+void job_handler(int signal, siginfo_t* siginf, void* slot);
+
+/**
 	* Command Decision Structure
 	*
 	* @param cmd command struct
@@ -155,7 +166,12 @@ int exec_basic_command(command_t* cmd, char* envp[]);
 	*/
 int exec_redir_command(command_t* cmd, bool io, char* envp[]);
 
+int exec_backg_command(command_t* cmd, char* envp[]);
+
+void job_handler(int signal, siginfo_t* siginf, void* slot);
+
 //Signal Masking definition
-sigset_t mask;
+sigset_t sigmask_1;
+sigset_t sigmask_2;
 
 #endif // QUASH_H
