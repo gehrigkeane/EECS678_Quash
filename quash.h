@@ -37,6 +37,13 @@ typedef struct command_t {
 		// Extend with more fields if needed
 } command_t;
 
+typedef struct job {
+	char* cmdstr;
+	bool status;
+	int pid;
+	int jid;
+} job;
+
 /**
 	* Query if quash should accept more input or not.
 	*

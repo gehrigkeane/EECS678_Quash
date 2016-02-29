@@ -33,7 +33,7 @@ static void start() {
 }
 
 /**************************************************************************
- * Public Functions 
+ * Helper Functions 
  **************************************************************************/
 bool is_running() {
 	return running;
@@ -43,6 +43,17 @@ void terminate() {
 	running = false;
 }
 
+/**************************************************************************
+ * String Manipulation Functions 
+ **************************************************************************/
+
+/**
+	* Parse Raw Command string
+	*
+	* @param cmd command struct
+	* @param in instream
+	* @return bool successful parse
+ */
 bool get_command(command_t* cmd, FILE* in) {
 	if (fgets(cmd->cmdstr, MAX_COMMAND_LENGTH, in) != NULL) {
 		size_t len = strlen(cmd->cmdstr);
@@ -68,16 +79,18 @@ bool get_command(command_t* cmd, FILE* in) {
 		cmd->tok = malloc( sizeof(char*) * MAX_COMMAND_ARGLEN );
 		cmd->toklen = 0;
 
-		char * temp = cmd->cmdstr;
-		temp = strtok (cmd->cmdstr," ");
-		while (temp != NULL)
+		char* token = malloc( sizeof(char*) * MAX_COMMAND_ARGLEN );
+
+		token = strtok (cmd->cmdstr," ");
+		while (token != NULL)
 		{
-			//debug print - printf ("%d: %s\n", (int)cmd->toklen, temp);
-			cmd->tok[cmd->toklen] = temp;
+			//debug print - printf ("%d: %s\n", (int)cmd->toklen, token);
+			cmd->tok[cmd->toklen] = token;
 			cmd->toklen++;
-			temp = strtok (NULL, " ");
+			token = strtok (NULL, " ");
 		}
 
+		free(token);
 		////////////////////////////////////////////////////////////////////////////////
 		// Remove NULL token from end
 		////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +110,10 @@ void print_init() {
 	if ( getcwd(cwd, sizeof(cwd)) )
 		printf("%s $ ", cwd);
 }
+
+/**************************************************************************
+ * Shell Fuctionality 
+ **************************************************************************/
 
 /**
 	* Echo Implementation
@@ -180,6 +197,10 @@ void set(command_t* cmd) {
 	}
 }
 
+/**************************************************************************
+ * Execution Functions 
+ **************************************************************************/
+
 /**
 	* Command Decision Structure
 	*
@@ -237,6 +258,10 @@ int exec_command(command_t* cmd, char* envp[])
 	return RETURN_CODE;
 }
 
+/**************************************************************************
+ * MAIN
+ **************************************************************************/
+
 /**
 	* Quash entry point
 	*
@@ -274,7 +299,6 @@ int main(int argc, char** argv, char** envp) {
 
 	// Main execution loop
 	while (is_running() && get_command(&cmd, stdin)) {
-
 		// The commands should be parsed, then executed.
 		if (!strcmp(cmd.cmdstr, "exit") || !strcmp(cmd.cmdstr, "quit")) {
 			terminate(); // Exit Quash
