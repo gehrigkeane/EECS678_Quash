@@ -43,6 +43,15 @@ void terminate() {
 	running = false;
 }
 
+void mask_signal(int signal)
+{
+	printf("\n");
+}
+
+void unmask_signal(int signal)
+{
+	exit(0); 
+} 
 /**************************************************************************
  * String Manipulation Functions 
  **************************************************************************/
@@ -102,6 +111,11 @@ bool get_command(command_t* cmd, FILE* in) {
 		return false;
 }
 
+/**
+	* Print Current Working Directory before shell commands
+	*
+	* @return void
+ */
 void print_init() {
 	////////////////////////////////////////////////////////////////////////////////
 	// Print Current Working Dir before each command
@@ -253,9 +267,66 @@ int exec_command(command_t* cmd, char* envp[])
 		// execute pipe command
 	}
 	else {
-		// execute basic command
+		RETURN_CODE = exec_basic_command(cmd, envp);
 	}
 	return RETURN_CODE;
+}
+
+/**
+	* Executes any command that can be handled with execvpe (ergo free of |, <, >, or &)
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	* @return RETURN_CODE
+ */
+int exec_basic_command(command_t* cmd, char* envp[])
+{
+	////////////////////////////////////////////////////////////////////////////////
+	// Mask Inturrept Signals and Initialize Variables
+	////////////////////////////////////////////////////////////////////////////////
+	pid_t p;
+	int wait_status;
+	signal(SIGINT, mask_signal);  
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Fork Process and Execute Command
+	////////////////////////////////////////////////////////////////////////////////
+	p = fork();
+	if (p < 0) {
+		fprintf(stderr, "\nError forking basic command. Error:%d\n", errno);
+		exit(EXIT_FAILURE);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Parent
+	////////////////////////////////////////////////////////////////////////////////
+	if (p != 0) {
+		if ( waitpid(p, &wait_status, 0) < 0 ) {
+			signal(SIGINT, unmask_signal);
+			fprintf(stderr, "\nError with basic command's child  %d. Error#%d\n", p, errno);
+			return EXIT_FAILURE;
+		}
+		if ( WIFEXITED(wait_status) && WEXITSTATUS(wait_status) == EXIT_FAILURE )
+			return EXIT_FAILURE;
+
+		signal(SIGINT, unmask_signal);
+		return EXIT_SUCCESS;
+	}
+	
+	////////////////////////////////////////////////////////////////////////////////
+	// Child
+	////////////////////////////////////////////////////////////////////////////////
+	else {
+		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
+			fprintf(stderr, "\n%s not found.\n", cmd->tok[0]);
+			exit(EXIT_FAILURE);
+		}
+		else {
+			fprintf(stderr, "\nError execing %s. Error#%d\n", cmd->tok[0], errno);
+			exit(EXIT_FAILURE);
+		}
+		exit(EXIT_SUCCESS);
+	}
 }
 
 /**************************************************************************
