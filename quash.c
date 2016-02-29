@@ -163,14 +163,13 @@ void set(command_t* cmd) {
 		printf("set: No command given\n");
 	}
 	else {
-		// Environment variable to change
+		// Get the environment variable and directory
+		// (Delimited by '=')
 		char* env = strtok(cmd->tok[1], "=");
-
-		// Directory to change the environment variable to
 		char* dir = strtok(NULL, "=");
 
 		if (env == NULL || dir == NULL) {
-			printf("set: Incorrect syntax (missing '='). Possible Usages:\n");
+			printf("set: Incorrect syntax. Possible Usages:\n");
 			printf("\tset PATH=/directory/to/use/for/path\n");
 			printf("\tset HOME=/directory/to/use/for/home\n");
 		}
