@@ -184,6 +184,63 @@ void set(command_t* cmd) {
 }
 
 /**
+	* Command Decision Structure
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	* @return RETURN_CODE
+ */
+int exec_command(command_t* cmd, char* envp[])
+{
+	////////////////////////////////////////////////////////////////////////////////
+	// Command Flag Initializations
+	////////////////////////////////////////////////////////////////////////////////
+	bool b_bool = false;	//background
+	bool i_bool = false;	//input redirection
+	bool o_bool = false;	//output redirection
+	bool p_bool = false;	//pipe
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Walk command tokens and flip flags
+	////////////////////////////////////////////////////////////////////////////////
+	int i = 1;
+	for (; i < cmd->toklen; i++) {
+		if ( !strcmp(cmd->tok[i], "&") )
+			b_bool = true;
+		else if ( !strcmp(cmd->tok[i], "<") )
+			i_bool = true;
+		else if ( !strcmp(cmd->tok[i], ">") )
+			o_bool = true;
+		else if ( !strcmp(cmd->tok[i], "|") )
+			p_bool = true;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Execute designated command
+	////////////////////////////////////////////////////////////////////////////////
+	int RETURN_CODE = 0;
+	// we have access to numArgs here and this will be portable
+	if ( b_bool ) {
+		cmd->tok[cmd->toklen - 1] = '\0'; // remove & token
+		cmd->toklen--;
+		//execute background command
+	} 
+	else if ( i_bool ) {
+		//execute in stream command
+	}
+	else if ( o_bool ) {
+		//execute out stream command
+	}
+	else if ( p_bool ) {
+		// execute pipe command
+	}
+	else {
+		// execute basic command
+	}
+	return RETURN_CODE;
+}
+
+/**
 	* Quash entry point
 	*
 	* @param argc argument count from the command line
@@ -248,11 +305,12 @@ int main(int argc, char** argv, char** envp) {
 		}
 		else {
 			//TODO: IMPLEMENT EXECUTE COMMAND FUNCTION
-			int i = 0;
+			/*int i = 0;
 			puts("Struct Token String\n");
 			for (;i <= cmd.toklen; i++) {
 				printf ("%d: %s\n", i, cmd.tok[i]);
-			}
+			}*/
+			exec_command(&cmd, envp);
 		}
 
 		print_init();
