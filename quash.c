@@ -148,6 +148,42 @@ void cd(command_t* cmd)
 	}
 }
 
+
+/**
+	* Set Implementation
+	*
+	* Assigns the specified environment variable (HOME or PATH),
+	* or displays an error for user mistakes.
+	*
+	* @param cmd command struct
+	* @return void
+ */
+void set(command_t* cmd) {
+	if (cmd->tok[1] == NULL) {
+		printf("set: No command given\n");
+	}
+	else {
+		// Environment variable to change
+		char* env = strtok(cmd->tok[1], "=");
+
+		// Directory to change the environment variable to
+		char* dir = strtok(NULL, "=");
+
+		if (env == NULL || dir == NULL) {
+			printf("set: Incorrect syntax (missing '='). Possible Usages:\n");
+			printf("\tset PATH=/directory/to/use/for/path\n");
+			printf("\tset HOME=/directory/to/use/for/home\n");
+		}
+		else if (!strcmp(env, "PATH") || !strcmp(env, "HOME")) {
+			// Set the environment variable
+			setenv(env, dir, 1);
+		}
+		else {
+			printf("set: available only for PATH or HOME environment variables\n");
+		}
+	}
+}
+
 /**
 	* Quash entry point
 	*
@@ -209,8 +245,7 @@ int main(int argc, char** argv, char** envp) {
 			printf("IMPLEMENT KILL FUNCTION\n");
 		}
 		else if (!strcmp(cmd.tok[0], "set")) {
-			//TODO: IMPLEMENT SET FUNCTION HERE
-			printf("IMPLEMENT SET FUNCTION\n");
+			set(&cmd);
 		}
 		else {
 			//TODO: IMPLEMENT EXECUTE COMMAND FUNCTION
