@@ -145,6 +145,16 @@ int exec_command(command_t* cmd, char* envp[]);
  */
 int exec_basic_command(command_t* cmd, char* envp[]);
 
+/**
+	* Executes any command with an I/O redirection present 
+	*
+	* @param cmd command struct
+	* @param io true is stdin, false is stdout
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
+int exec_redir_command(command_t* cmd, bool io, char* envp[]);
+
 //Signal Masking definition
 sigset_t mask;
 

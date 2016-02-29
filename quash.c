@@ -190,7 +190,7 @@ void jobs(command_t* cmd) {
 		int i = 0;
 		for (; i < num_jobs; i++) {
 			if(all_jobs[i].status) {
-				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr->tok[0]); 
+				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr); 
 			}
 		}
 	}
@@ -280,10 +280,10 @@ int exec_command(command_t* cmd, char* envp[])
 		//execute background command
 	} 
 	else if ( i_bool ) {
-		//execute in stream command
+		RETURN_CODE = exec_redir_command(cmd, true, envp);
 	}
 	else if ( o_bool ) {
-		//execute out stream command
+		RETURN_CODE = exec_redir_command(cmd, false, envp);
 	}
 	else if ( p_bool ) {
 		// execute pipe command
@@ -311,11 +311,11 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	signal(SIGINT, mask_signal);  
 
 	////////////////////////////////////////////////////////////////////////////////
-	// Fork Process and Execute Command
+	// Fork And Verify Process
 	////////////////////////////////////////////////////////////////////////////////
 	p = fork();
 	if (p < 0) {
-		fprintf(stderr, "\nError forking basic command. Error:%d\n", errno);
+		fprintf(stderr, "Error forking basic command. Error:%d\n", errno);
 		exit(EXIT_FAILURE);
 	}
 
@@ -325,7 +325,7 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	if (p != 0) {
 		if ( waitpid(p, &wait_status, 0) < 0 ) {
 			signal(SIGINT, unmask_signal);
-			fprintf(stderr, "\nError with basic command's child  %d. Error#%d\n", p, errno);
+			fprintf(stderr, "Error with basic command's child  %d. ERRNO\"%d\"\n", p, errno);
 			return EXIT_FAILURE;
 		}
 		if ( WIFEXITED(wait_status) && WEXITSTATUS(wait_status) == EXIT_FAILURE )
@@ -340,16 +340,112 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	////////////////////////////////////////////////////////////////////////////////
 	else {
 		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
-			fprintf(stderr, "\n%s not found.\n", cmd->tok[0]);
+			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
 			exit(EXIT_FAILURE);
 		}
 		else {
-			fprintf(stderr, "\nError execing %s. Error#%d\n", cmd->tok[0], errno);
+			fprintf(stderr, "Error executing %s. ERRNO\"%d\"\n", cmd->tok[0], errno);
 			exit(EXIT_FAILURE);
 		}
 		exit(EXIT_SUCCESS);
+	}
+}
 
+/**
+	* Executes any command with an I/O redirection present 
+	*
+	* @param cmd command struct
+	* @param io true is stdin, false is stdout
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
+int exec_redir_command(command_t* cmd, bool io, char* envp[])
+{
+	////////////////////////////////////////////////////////////////////////////////
+	// Mask Inturrept Signals and Initialize Variables
+	////////////////////////////////////////////////////////////////////////////////
+	pid_t p;
+	int wait_status;
+	int file_desc;
+	signal(SIGINT, mask_signal);  
 
+	////////////////////////////////////////////////////////////////////////////////
+	// Fork And Verify Process
+	////////////////////////////////////////////////////////////////////////////////
+	p = fork();
+	if (p < 0) {
+		fprintf(stderr, "Error forking redir command. ERRNO\"%d\"\n", errno);
+		exit(EXIT_FAILURE);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Parent
+	////////////////////////////////////////////////////////////////////////////////
+	if (p != 0) {
+		if (waitpid(p, &wait_status, 0) == -1) {
+			fprintf(stderr, "Error with redir command's child  %d. ERRNO\"%d\"\n", p, errno);
+			return EXIT_FAILURE;
+		}
+		if ( WIFEXITED(wait_status) && WEXITSTATUS(wait_status) == EXIT_FAILURE )
+			return EXIT_FAILURE;
+
+		signal(SIGINT, unmask_signal);
+		return EXIT_SUCCESS;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Child
+	////////////////////////////////////////////////////////////////////////////////
+	else {
+		////////////////////////////////////////////////////////////////////////////////
+		// Initialize and Verify File Descriptor
+		////////////////////////////////////////////////////////////////////////////////
+		if (io)
+			file_desc = open(cmd->tok[cmd->toklen - 1], O_RDONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+		else
+			file_desc = open(cmd->tok[cmd->toklen - 1], O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+		if (file_desc < 0) {
+			fprintf(stderr, "\nError opening %s. ERRNO\"%d\"\n", cmd->tok[cmd->toklen - 1], errno);
+			exit(EXIT_FAILURE);
+		}
+
+		////////////////////////////////////////////////////////////////////////////////
+		// Redirect I/O Streams
+		////////////////////////////////////////////////////////////////////////////////
+		if (io) {
+			if (dup2(file_desc, STDIN_FILENO) < 0) {
+				fprintf(stderr, "\nError redirecting STDIN to %s. ERRNO\"%d\"\n", cmd->tok[cmd->toklen - 1], errno);
+				exit(EXIT_FAILURE);
+			}
+		}
+		else {
+			if (dup2(file_desc, STDOUT_FILENO) < 0) {
+				fprintf(stderr, "\nError redirecting STDOUT to %s. ERRNO\"%d\"\n", cmd->tok[cmd->toklen - 1], errno);
+				exit(EXIT_FAILURE);
+			}
+		}
+
+		////////////////////////////////////////////////////////////////////////////////
+		// Execute Command - remove last two redirection arguments
+		////////////////////////////////////////////////////////////////////////////////
+		close(file_desc);
+		cmd->tok[cmd->toklen - 1] = NULL;
+		cmd->tok[cmd->toklen - 2] = NULL;
+		cmd->toklen = cmd->toklen - 2;
+
+		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
+			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
+			exit(EXIT_FAILURE);
+		}
+		else {
+			fprintf(stderr, "Error executing %s. ERRNO\"%d\"\n", cmd->tok[0], errno);
+			exit(EXIT_FAILURE);
+		}
+		signal(SIGINT, unmask_signal);
+		exit(EXIT_SUCCESS);
+	}
+}
 
 /**************************************************************************
  * MAIN
