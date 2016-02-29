@@ -81,7 +81,7 @@ bool get_command(command_t* cmd, FILE* in) {
 		////////////////////////////////////////////////////////////////////////////////
 		// Remove NULL token from end
 		////////////////////////////////////////////////////////////////////////////////
-		cmd->toklen--;
+		cmd->tok[cmd->toklen] = '\0';
 
 		return true;
 	}
@@ -107,12 +107,23 @@ void print_init() {
  */
 void echo(command_t* cmd) 
 {
-	if ( cmd->toklen != 1 || strcmp(cmd->tok[1], "$HOME") )
+	if ( cmd->toklen == 2 ) {
+		if ( !strcmp(cmd->tok[1], "$HOME") )
+			puts(getenv("HOME"));
+		else if ( !strcmp(cmd->tok[1], "$PATH") )
+			puts(getenv("PATH"));
+		else
+			puts(cmd->tok[1]);
+	}
+	else if ( cmd->toklen == 1 ) {
 		puts(getenv("HOME"));
-	else if ( strcmp(cmd->tok[1], "$PATH") )
-		puts(getenv("PATH"));
-	else
-		puts(cmd->tok[1]);
+	}
+	else{
+		int i = 1;
+		for ( ; i < cmd->toklen; i++ )
+			printf("%s ", cmd->tok[i]);
+		puts("");
+	}
 }
 
 
@@ -125,11 +136,11 @@ void echo(command_t* cmd)
  */
 void cd(command_t* cmd) 
 {
-	if ( cmd->toklen < 1 ) {
+	if ( cmd->toklen < 2 ) {
 		if ( chdir(getenv("HOME")) )
 			printf("cd: %s: Cannot navigate to $HOME\n", getenv("HOME"));
 	}
-	else if ( cmd->toklen > 1 )
+	else if ( cmd->toklen > 2 )
 		puts("Too many arguments");
 	else { 
 		if ( chdir(cmd->tok[1]) )
@@ -144,7 +155,7 @@ void cd(command_t* cmd)
 	* @param argv argument vector from the command line
 	* @return program exit status
  */
-int main(int argc, char** argv) { 
+int main(int argc, char** argv, char** envp) { 
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Init Signal Masking
