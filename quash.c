@@ -22,6 +22,10 @@
 // to private in other languages.
 static bool running;
 
+static struct job all_jobs[MAX_NUM_JOBS];
+
+static int num_jobs;
+
 /**************************************************************************
  * Private Functions 
  **************************************************************************/
@@ -258,6 +262,24 @@ int exec_command(command_t* cmd, char* envp[])
 	return RETURN_CODE;
 }
 
+/**
+	* Displays all currently running jobs
+	* @return void
+	*/
+void jobs(command_t* cmd) {
+	if (cmd->tok[1] == NULL) {
+		int i = 0;
+		for (; i < num_jobs; i++) {
+			if(all_jobs[i].status) {
+				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr->tok[0]); 
+			}
+		}
+	}
+	else {
+		printf("jobs: Unknown command \"%s\"\n", cmd->tok[1]);
+	}
+}
+
 /**************************************************************************
  * MAIN
  **************************************************************************/
@@ -314,8 +336,7 @@ int main(int argc, char** argv, char** envp) {
 			echo(&cmd);
 		}
 		else if (!strcmp(cmd.tok[0], "jobs")) {
-			//TODO: IMPLEMENT JOBS FUNCTION HERE
-			printf("IMPLEMENT JOBS FUNCTION\n");
+			jobs(&cmd);
 		}
 		else if (!strcmp(cmd.tok[0], "kill")) {
 			//TODO: IMPLEMENT KILL FUNCTION HERE
