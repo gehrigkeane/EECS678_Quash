@@ -1,0 +1,13 @@
+./quash &
+
+jobs
+
+pwd
+
+echo $PATH
+
+set PATH=/usr/bin:/bin
+
+echo $PATH
+
+exit

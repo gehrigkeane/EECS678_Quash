@@ -168,7 +168,11 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[]);
 
 int exec_backg_command(command_t* cmd, char* envp[]);
 
+void exec_from_file(char** argv, int argc, char* envp[]);
+
 void job_handler(int signal, siginfo_t* siginf, void* slot);
+
+void run_quash(command_t* cmd, char** envp);
 
 //Signal Masking definition
 sigset_t sigmask_1;

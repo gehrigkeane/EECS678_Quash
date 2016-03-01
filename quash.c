@@ -22,6 +22,8 @@
 // to private in other languages.
 static bool running;
 
+static bool running_from_file;
+
 static struct job all_jobs[MAX_NUM_JOBS];
 
 static int num_jobs = 0;
@@ -36,15 +38,23 @@ static void start() {
 	running = true;
 }
 
+static void start_from_file() {
+	running_from_file = true;
+}
+
 /**************************************************************************
  * Helper Functions 
  **************************************************************************/
 bool is_running() {
-	return running;
+	return running || running_from_file;
 }
 
 void terminate() {
 	running = false;
+}
+
+void terminate_from_file() {
+	running_from_file = false;
 }
 
 void mask_signal(int signal)
@@ -140,7 +150,7 @@ void print_init() {
 	// Print Current Working Dir before each command
 	////////////////////////////////////////////////////////////////////////////////
 	char cwd[MAX_COMMAND_LENGTH];		//cwd arg - print before each shell command
-	if ( getcwd(cwd, sizeof(cwd)) )
+	if ( getcwd(cwd, sizeof(cwd)) && !running_from_file)
 		printf("\n[Quash: %s] q$ ", cwd);
 }
 
@@ -570,6 +580,18 @@ int exec_backg_command(command_t* cmd, char* envp[])
 	
 }
 
+void exec_from_file(char** argv, int argc, char* envp[]) {
+	command_t cmd;
+
+	start_from_file();
+
+	while (get_command(&cmd, stdin)) {
+		run_quash(&cmd, envp);
+	}
+
+	terminate_from_file();
+}
+
 
 
 /**************************************************************************
@@ -597,7 +619,10 @@ int main(int argc, char** argv, char** envp) {
 	if ( !isatty( (fileno(stdin) ) ) ) {
 		//Detect quash execution with redirected input
 		//We'll deal with this later
-		return 0;
+
+		exec_from_file(argv, argc, envp);
+
+		return EXIT_SUCCESS;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -613,44 +638,45 @@ int main(int argc, char** argv, char** envp) {
 
 	// Main execution loop
 	while (is_running() && get_command(&cmd, stdin)) {
-		// The commands should be parsed, then executed.
-		if (!strcmp(cmd.cmdstr, "exit") || !strcmp(cmd.cmdstr, "quit")) {
-			terminate(); // Exit Quash
-		}
-		else if (!cmd.cmdlen) {
-			print_init();
-			continue;
-		}
-		else if (strcmp(cmd.tok[0], "cd") == 0) {
-			cd(&cmd);
-		}
-		else if (strcmp(cmd.tok[0], "echo") == 0) {
-			echo(&cmd);
-		}
-		else if (!strcmp(cmd.tok[0], "jobs")) {
-			jobs(&cmd);
-		}
-		else if (!strcmp(cmd.tok[0], "kill")) {
-			//TODO: IMPLEMENT KILL FUNCTION HERE
-			printf("IMPLEMENT KILL FUNCTION\n");
-		}
-		else if (!strcmp(cmd.tok[0], "set")) {
-			set(&cmd);
-		}
-		else {
-			//TODO: IMPLEMENT EXECUTE COMMAND FUNCTION
-			/*int i = 0;
-			puts("Struct Token String\n");
-			for (;i <= cmd.toklen; i++) {
-				printf ("%d: %s\n", i, cmd.tok[i]);
-			}*/
-			exec_command(&cmd, envp);
-			print_init();
-			continue;
-		}
-
-		print_init();
+		run_quash(&cmd, envp);
 	}
 
 	return EXIT_SUCCESS;
+}
+
+void run_quash(command_t* cmd, char** envp) {
+	// The commands should be parsed, then executed.
+	if (!strcmp(cmd->cmdstr, "exit") || !strcmp(cmd->cmdstr, "quit")) {
+		terminate(); // Exit Quash
+	}
+	else if (!cmd->cmdlen) {
+		// Do nothing -- just print the cwd to display we're still in the shell.
+	}
+	else if (strcmp(cmd->tok[0], "cd") == 0) {
+		cd(cmd);
+	}
+	else if (strcmp(cmd->tok[0], "echo") == 0) {
+		echo(cmd);
+	}
+	else if (!strcmp(cmd->tok[0], "jobs")) {
+		jobs(cmd);
+	}
+	else if (!strcmp(cmd->tok[0], "kill")) {
+		//TODO: IMPLEMENT KILL FUNCTION HERE
+		printf("IMPLEMENT KILL FUNCTION\n");
+	}
+	else if (!strcmp(cmd->tok[0], "set")) {
+		set(cmd);
+	}
+	else {
+		//TODO: IMPLEMENT EXECUTE COMMAND FUNCTION
+		/*int i = 0;
+		puts("Struct Token String\n");
+		for (;i <= cmd.toklen; i++) {
+			printf ("%d: %s\n", i, cmd.tok[i]);
+		}*/
+		exec_command(cmd, envp);
+	}
+
+	print_init();
 }
