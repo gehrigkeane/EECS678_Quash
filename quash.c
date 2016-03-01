@@ -580,6 +580,13 @@ int exec_backg_command(command_t* cmd, char* envp[])
 	
 }
 
+/**
+	* Executes any Quash commands from the given file 
+	*
+	* @param argc argument count from the command line
+	* @param argv argument vector from the command line
+	* @return void
+	*/
 void exec_from_file(char** argv, int argc, char* envp[]) {
 	command_t cmd;
 
@@ -644,6 +651,13 @@ int main(int argc, char** argv, char** envp) {
 	return EXIT_SUCCESS;
 }
 
+/**
+	* Runs the specified Quash command
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	* @return void
+	*/
 void run_quash(command_t* cmd, char** envp) {
 	// The commands should be parsed, then executed.
 	if (!strcmp(cmd->cmdstr, "exit") || !strcmp(cmd->cmdstr, "quit")) {
