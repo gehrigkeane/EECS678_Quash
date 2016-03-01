@@ -6,6 +6,10 @@
 
 #ifndef QUASH_H
 #define QUASH_H
+
+/**
+	* Defines GNU Source type for compialtion
+	*/
 #define _GNU_SOURCE
 
 #include <errno.h>
@@ -19,28 +23,35 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-
 /**
 	* Specify the maximum number of characters accepted by the command string
 	*/
 #define MAX_COMMAND_TITLE (128)
+/**
+	* Specify the maximum number of arguments in a command
+	*/
 #define MAX_COMMAND_ARGLEN (32)
+/**
+	* Specify the maximum number of characters accepted by the command string
+	*/
 #define MAX_COMMAND_LENGTH (1024)
-
+/**
+	* Specify the maximum number of background jobs
+	*/
 #define MAX_NUM_JOBS (100)
 
 /**
 	* Holds information about a command.
 	*/
 typedef struct command_t {
-		char** tok;							//tokenized command
+		char** tok;							///< tokenized command array
 		char cmdstr[MAX_COMMAND_LENGTH];	///< character buffer to store the
 											///< command string. You may want
 											///< to modify this to accept
 											///< arbitrarily long strings for
 											///< robustness.
 		size_t cmdlen;						///< length of the cmdstr character buffer
-		size_t toklen;
+		size_t toklen;						///< tokenized command array length
 		// Extend with more fields if needed
 } command_t;
 
@@ -48,11 +59,25 @@ typedef struct command_t {
 	* Holds information about a running process (job).
 	*/
 typedef struct job {
-	char* cmdstr;							// The command issued for this process
-	bool status;							// Status for this process (running or not)
-	int pid;								// Process ID #
-	int jid;								// Job ID #
+	char* cmdstr;							///< The command issued for this process
+	bool status;							///< Status for this process (running or not)
+	int pid;								///< Process ID #
+	int jid;								///< Job ID #
 } job;
+
+/**
+	* Signal Masking Variable
+	*/
+sigset_t sigmask_1;
+
+/**
+	* Signal Masking Variable
+	*/
+sigset_t sigmask_2;
+
+/**************************************************************************
+ * Helper Functions 
+ **************************************************************************/
 
 /**
 	* Query if quash should accept more input or not.
@@ -67,6 +92,60 @@ bool is_running();
 void terminate();
 
 /**
+	* Terminates quash file execution
+	*/
+void terminate_from_file();
+
+/**
+	* Mask Signal
+	*
+	* silences signals during quash execution for safety
+	*
+	* @param signal integer
+ */
+void mask_signal(int signal);
+
+/**
+	* Unmask Signal
+	*
+	* @param signal integer
+ */
+void unmask_signal(int signal);
+
+/**
+	* Print tokens from a cmd struct
+	*
+	* @param cmd command struct
+	*/
+void print_cmd_tokens(command_t* cmd);
+
+/**
+	* Print Current Working Directory before shell commands
+	*/
+void print_init();
+
+/**
+	* Handles exiting signal from background processes
+	*
+	* @param signal int
+	* @param sig struct
+	* @param slot
+	*/
+void job_handler(int signal, siginfo_t* sig, void* slot);
+
+/* 
+	* Kill Command from jobs listing
+	*
+	* @param cmd command struct
+	* @return: RETURN_CODE
+*/
+int kill_proc(command_t* cmd);
+
+/**************************************************************************
+ * String Manipulation Functions 
+ **************************************************************************/
+
+/**
 	*  Read in a command and setup the #command_t struct. Also perform some minor
 	*  modifications to the string to remove trailing newline characters.
 	*
@@ -77,27 +156,29 @@ void terminate();
 	*/
 bool get_command(command_t* cmd, FILE* in);
 
-/**
-	* Print Current Working Directory before shell commands
- */
-void print_init();
-
-/**
-	* Echo Implementation
-	*
-	* @param cmd command struct
-	* @return void
- */
-void echo(command_t* cmd);
+/**************************************************************************
+ * Shell Fuctionality 
+ **************************************************************************/
 
 /**
 	* CD Implementation
 	*
 	* @param cmd command struct
-	* @return void
 	* Note: chdir will make new dir's if they don't exist
  */
 void cd(command_t* cmd);
+
+/**
+	* Echo Implementation
+	*
+	* @param cmd command struct
+ */
+void echo(command_t* cmd);
+
+/**
+	* Displays all currently running jobs
+	*/
+void jobs(command_t* cmd);
 
 /**
 	* Set Implementation
@@ -106,37 +187,33 @@ void cd(command_t* cmd);
 	* or displays an error for user mistakes.
 	*
 	* @param cmd command struct
-	* @return void
  */
 void set(command_t* cmd);
 
-/**
-	* Mask Signal
-	*
-	* silences signals during quash execution for safety
-	*
-	* @param signal integer
-	* @return void
- */
-void mask_signal(int signal);
+/**************************************************************************
+ * File Execution Functions 
+ **************************************************************************/
 
 /**
-	* Unmask Signal
+	* Executes any Quash commands from the given file 
 	*
-	* @param signal integer
-	* @return void
- */
-void unmask_signal(int signal);
-
-/**
-	* Handles job completion on completion signal
-	*
-	* @param int signal 
-	* @param siginf
-	* @param slot
-	* @return void
+	* @param argc argument count from the command line
+	* @param argv argument vector from the command line
+	* @param envp environment variables
 	*/
-void job_handler(int signal, siginfo_t* siginf, void* slot);
+void exec_from_file(char** argv, int argc, char* envp[]);
+
+/**************************************************************************
+ * Execution Functions 
+ **************************************************************************/
+
+/**
+	* Runs the specified Quash command
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	*/
+void run_quash(command_t* cmd, char** envp);
 
 /**
 	* Command Decision Structure
@@ -166,16 +243,13 @@ int exec_basic_command(command_t* cmd, char* envp[]);
 	*/
 int exec_redir_command(command_t* cmd, bool io, char* envp[]);
 
+/**
+	* Executes any command with an & present 
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
 int exec_backg_command(command_t* cmd, char* envp[]);
-
-void exec_from_file(char** argv, int argc, char* envp[]);
-
-void job_handler(int signal, siginfo_t* siginf, void* slot);
-
-void run_quash(command_t* cmd, char** envp);
-
-//Signal Masking definition
-sigset_t sigmask_1;
-sigset_t sigmask_2;
 
 #endif // QUASH_H

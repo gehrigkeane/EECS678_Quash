@@ -38,6 +38,9 @@ static void start() {
 	running = true;
 }
 
+/**
+	* Flag file commands supply
+	*/
 static void start_from_file() {
 	running_from_file = true;
 }
@@ -45,42 +48,128 @@ static void start_from_file() {
 /**************************************************************************
  * Helper Functions 
  **************************************************************************/
+
+/**
+	* Query if quash should accept more input or not.
+	*
+	* @return True if Quash should accept more input and false otherwise
+	*/
 bool is_running() {
 	return running || running_from_file;
 }
 
+/**
+	* Causes the execution loop to end.
+	*/
 void terminate() {
 	running = false;
 }
 
+/**
+	* Terminates quash file execution
+	*/
 void terminate_from_file() {
 	running_from_file = false;
 }
 
-void mask_signal(int signal)
-{
+/**
+	* Mask Signal
+	*
+	* silences signals during quash execution for safety
+	*
+	* @param signal integer
+ */
+void mask_signal(int signal) {
 	printf("\n");
 }
 
-void unmask_signal(int signal)
-{
+/**
+	* Unmask Signal
+	*
+	* @param signal integer
+ */
+void unmask_signal(int signal) {
 	exit(0); 
 }
 
-void job_handler(int signal, siginfo_t* siginf, void* slot)
-{
-	pid_t p = siginf->si_pid;
+/**
+	* Print tokens from a cmd struct
+	*
+	* @param cmd command struct
+	*/
+void print_cmd_tokens(command_t* cmd) {
+	int i = 0;
+	puts("Struct Token String\n");
+	for (;i <= cmd->toklen; i++)
+		printf ("%d: %s\n", i, cmd->tok[i]);
+}
+
+/**
+	* Print Current Working Directory before shell commands
+	*/
+void print_init() {
+	char cwd[MAX_COMMAND_LENGTH];	//cwd arg - print before each shell command
+	if ( getcwd(cwd, sizeof(cwd)) && !running_from_file)
+		printf("\n[Quash: %s] q$ ", cwd);
+}
+
+/**
+	* Handles exiting signal from background processes
+	*
+	* @param signal int
+	* @param sig struct
+	* @param slot
+	*/
+void job_handler(int signal, siginfo_t* sig, void* slot) {
+	pid_t p = sig->si_pid;
 	int i = 0;
 	for (; i < num_jobs; ++i) {
 		if (all_jobs[i].pid == p)
 			break;
 	}
 	if (i < num_jobs) {
-		printf("[%d] %d finished %s\n", all_jobs[i].jid, p, all_jobs[i].cmdstr); 
+		printf("\n[%d] %d finished %s\n", all_jobs[i].jid, p, all_jobs[i].cmdstr);
 		all_jobs[i].status = true;
 		free(all_jobs[i].cmdstr);
 	}
 }
+
+/* 
+	* Kill Command from jobs listing
+	*
+	* @param cmd command struct
+	* @return: RETURN_CODE
+*/
+int kill_proc(command_t* cmd) {
+	////////////////////////////////////////////////////////////////////////////////
+	// Kill requires 3 arguments
+	////////////////////////////////////////////////////////////////////////////////
+	if (cmd->toklen == 3) {
+		int ksignal;
+		sscanf(cmd->tok[1], "%d", &ksignal);
+		int num;
+		sscanf(cmd->tok[2], "%d", &num);
+
+		////////////////////////////////////////////////////////////////////////////////
+		// Kill provided Job
+		////////////////////////////////////////////////////////////////////////////////
+		if (all_jobs[num].pid)
+			kill(all_jobs[num].pid,ksignal); 
+		else {
+			printf("Error: process does not exist \n"); 
+			return EXIT_FAILURE; 
+		}
+	}
+	////////////////////////////////////////////////////////////////////////////////
+	// Otherwise error status
+	////////////////////////////////////////////////////////////////////////////////
+	else {
+		puts("kill: Incorrect syntax. provide 2 arguments:\n");
+		return EXIT_FAILURE; 
+	}
+	return EXIT_SUCCESS; 
+}
+
 /**************************************************************************
  * String Manipulation Functions 
  **************************************************************************/
@@ -140,20 +229,6 @@ bool get_command(command_t* cmd, FILE* in) {
 		return false;
 }
 
-/**
-	* Print Current Working Directory before shell commands
-	*
-	* @return void
-	*/
-void print_init() {
-	////////////////////////////////////////////////////////////////////////////////
-	// Print Current Working Dir before each command
-	////////////////////////////////////////////////////////////////////////////////
-	char cwd[MAX_COMMAND_LENGTH];		//cwd arg - print before each shell command
-	if ( getcwd(cwd, sizeof(cwd)) && !running_from_file)
-		printf("\n[Quash: %s] q$ ", cwd);
-}
-
 /**************************************************************************
  * Shell Fuctionality 
  **************************************************************************/
@@ -211,15 +286,13 @@ void echo(command_t* cmd)
 	* @return void
 	*/
 void jobs(command_t* cmd) {
-	if (cmd->tok[1] == NULL) {
-		int i = 0;
-		for (; i < num_jobs; i++) {
-			if(!all_jobs[i].status)
-				printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr); 
-		}
-	}
-	else
-		printf("jobs: Unknown command \"%s\"\n", cmd->tok[1]);
+    int i;
+
+    for (i = 0; i < num_jobs; i++) {
+        if (kill(all_jobs[i].pid, 0) == 0 && !all_jobs[i].status) {
+            printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr);
+        }
+    }
 }
 
 /**
@@ -257,8 +330,84 @@ void set(command_t* cmd) {
 }
 
 /**************************************************************************
+ * File Execution Functions 
+ **************************************************************************/
+
+/**
+	* Executes any Quash commands from the given file 
+	*
+	* @param argc argument count from the command line
+	* @param argv argument vector from the command line
+	* @param envp environment variables
+	*/
+void exec_from_file(char** argv, int argc, char* envp[]) {
+	
+	////////////////////////////////////////////////////////////////////////////////
+	// Args
+	////////////////////////////////////////////////////////////////////////////////
+	command_t cmd;
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Redirect Quash Standard Input
+	////////////////////////////////////////////////////////////////////////////////
+	start_from_file();
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Command Loop
+	////////////////////////////////////////////////////////////////////////////////
+	while (get_command(&cmd, stdin)) {
+		run_quash(&cmd, envp);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Terminate File execution and start normal program execution
+	////////////////////////////////////////////////////////////////////////////////
+	terminate_from_file();
+}
+
+/**************************************************************************
  * Execution Functions 
  **************************************************************************/
+
+/**
+	* Runs the specified Quash command
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	*/
+void run_quash(command_t* cmd, char** envp) {
+	////////////////////////////////////////////////////////////////////////////////
+	// Command Decision Structure
+	////////////////////////////////////////////////////////////////////////////////
+	if (!strcmp(cmd->cmdstr, "exit") || !strcmp(cmd->cmdstr, "quit")) {
+		terminate(); // Exit Quash
+	}
+	else if (!cmd->cmdlen) {
+		// Do nothing -- just print the cwd to display we're still in the shell.
+	}
+	else if (strcmp(cmd->tok[0], "cd") == 0) {
+		cd(cmd);
+	}
+	else if (strcmp(cmd->tok[0], "echo") == 0) {
+		echo(cmd);
+	}
+	else if (!strcmp(cmd->tok[0], "jobs")) {
+		jobs(cmd);
+	}
+	else if (!strcmp(cmd->tok[0], "kill")) {
+		kill_proc(cmd);
+	}
+	else if (!strcmp(cmd->tok[0], "set")) {
+		set(cmd);
+	}
+	else {
+		exec_command(cmd, envp);
+	}
+
+	if (running) {
+		print_init();
+	}
+}
 
 /**
 	* Command Decision Structure
@@ -300,12 +449,6 @@ int exec_command(command_t* cmd, char* envp[])
 	if ( b_bool ) {
 		cmd->tok[cmd->toklen - 1] = '\0'; // remove & token
 		cmd->toklen--;
-		int i = 0;
-		puts("Struct Token String\n");
-		for (;i <= cmd->toklen; i++) {
-			printf ("%d: %s\n", i, cmd->tok[i]);
-		}
-		//execute background command
 		RETURN_CODE = exec_backg_command(cmd, envp);
 	} 
 	else if ( i_bool ) {
@@ -487,7 +630,7 @@ int exec_backg_command(command_t* cmd, char* envp[])
 {
 	pid_t p;
 	int wait_status;
-	//int file_desc;
+	int file_desc;
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Handle and Initialize Signal Masking
@@ -545,7 +688,7 @@ int exec_backg_command(command_t* cmd, char* envp[])
 		////////////////////////////////////////////////////////////////////////////////
 		// Map Child Process to different output
 		////////////////////////////////////////////////////////////////////////////////
-/*		char temp_file[MAX_COMMAND_LENGTH];
+		char temp_file[MAX_COMMAND_LENGTH];
 		char cpid [MAX_COMMAND_ARGLEN];
 		int ipid = getpid();
 
@@ -564,7 +707,6 @@ int exec_backg_command(command_t* cmd, char* envp[])
 			fprintf(stderr, "\nError redirecting STDOUT to %s. ERRNO\"%d\"\n", temp_file, errno);
 			exit(EXIT_FAILURE);
 		}
-*/
 
 		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
 			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
@@ -580,27 +722,6 @@ int exec_backg_command(command_t* cmd, char* envp[])
 	
 }
 
-/**
-	* Executes any Quash commands from the given file 
-	*
-	* @param argc argument count from the command line
-	* @param argv argument vector from the command line
-	* @return void
-	*/
-void exec_from_file(char** argv, int argc, char* envp[]) {
-	command_t cmd;
-
-	start_from_file();
-
-	while (get_command(&cmd, stdin)) {
-		run_quash(&cmd, envp);
-	}
-
-	terminate_from_file();
-}
-
-
-
 /**************************************************************************
  * MAIN
  **************************************************************************/
@@ -610,6 +731,7 @@ void exec_from_file(char** argv, int argc, char* envp[]) {
 	*
 	* @param argc argument count from the command line
 	* @param argv argument vector from the command line
+	* @param envp environment variables
 	* @return program exit status
 	*/
 int main(int argc, char** argv, char** envp) { 
@@ -621,76 +743,28 @@ int main(int argc, char** argv, char** envp) {
 	sigaddset(&sigmask_1, SIGCHLD);
 
 	////////////////////////////////////////////////////////////////////////////////
-	// Input stems from FILE
+	// Input stems from FILE - Redirects command interpretation structure
 	////////////////////////////////////////////////////////////////////////////////
 	if ( !isatty( (fileno(stdin) ) ) ) {
-		//Detect quash execution with redirected input
-		//We'll deal with this later
-
 		exec_from_file(argv, argc, envp);
-
 		return EXIT_SUCCESS;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Args
 	////////////////////////////////////////////////////////////////////////////////
-	command_t cmd;						//< Command holder argument
+	command_t cmd;										//< Command holder argument
 
 	start();
-	
-	puts("Welcome to Quash!");
-	puts("Type \"exit\" or \"quit\" to leave this shell");
+	puts("Welcome to Quash!\nType \"exit\" or \"quit\" to leave this shell");
 	print_init();
 
-	// Main execution loop
+	////////////////////////////////////////////////////////////////////////////////
+	// Main Execution Loop
+	////////////////////////////////////////////////////////////////////////////////
 	while (is_running() && get_command(&cmd, stdin)) {
 		run_quash(&cmd, envp);
 	}
 
 	return EXIT_SUCCESS;
-}
-
-/**
-	* Runs the specified Quash command
-	*
-	* @param cmd command struct
-	* @param envp environment variables
-	* @return void
-	*/
-void run_quash(command_t* cmd, char** envp) {
-	// The commands should be parsed, then executed.
-	if (!strcmp(cmd->cmdstr, "exit") || !strcmp(cmd->cmdstr, "quit")) {
-		terminate(); // Exit Quash
-	}
-	else if (!cmd->cmdlen) {
-		// Do nothing -- just print the cwd to display we're still in the shell.
-	}
-	else if (strcmp(cmd->tok[0], "cd") == 0) {
-		cd(cmd);
-	}
-	else if (strcmp(cmd->tok[0], "echo") == 0) {
-		echo(cmd);
-	}
-	else if (!strcmp(cmd->tok[0], "jobs")) {
-		jobs(cmd);
-	}
-	else if (!strcmp(cmd->tok[0], "kill")) {
-		//TODO: IMPLEMENT KILL FUNCTION HERE
-		printf("IMPLEMENT KILL FUNCTION\n");
-	}
-	else if (!strcmp(cmd->tok[0], "set")) {
-		set(cmd);
-	}
-	else {
-		//TODO: IMPLEMENT EXECUTE COMMAND FUNCTION
-		/*int i = 0;
-		puts("Struct Token String\n");
-		for (;i <= cmd.toklen; i++) {
-			printf ("%d: %s\n", i, cmd.tok[i]);
-		}*/
-		exec_command(cmd, envp);
-	}
-
-	print_init();
 }

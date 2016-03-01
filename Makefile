@@ -84,6 +84,6 @@ unsubmit: $(STUDENTID)-project1-quash.zip
 
 # Remove all generated files and directories
 clean:
-	-rm -rf $(PROGNAME) *.o *~ doc $(STUDENTID)-project1-quash*
+	-rm -rf $(PROGNAME) *.o *~ doc $(STUDENTID)-project1-quash* *.out
 
 .PHONY: all test doc submit unsubmit testsubmit clean
