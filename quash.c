@@ -286,13 +286,13 @@ void echo(command_t* cmd)
 	* @return void
 	*/
 void jobs(command_t* cmd) {
-    int i;
+	int i;
 
-    for (i = 0; i < num_jobs; i++) {
-        if (kill(all_jobs[i].pid, 0) == 0 && !all_jobs[i].status) {
-            printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr);
-        }
-    }
+	for (i = 0; i < num_jobs; i++) {
+		if (kill(all_jobs[i].pid, 0) == 0 && !all_jobs[i].status) {
+			printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr);
+		}
+	}
 }
 
 /**
@@ -458,7 +458,8 @@ int exec_command(command_t* cmd, char* envp[])
 		RETURN_CODE = exec_redir_command(cmd, false, envp);
 	}
 	else if ( p_bool ) {
-		// execute pipe command
+		RETURN_CODE = exec_pipe_command(cmd, envp);
+		printf("Pipe return code: %d", RETURN_CODE);
 	}
 	else {
 		RETURN_CODE = exec_basic_command(cmd, envp);
@@ -480,7 +481,7 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	////////////////////////////////////////////////////////////////////////////////
 	pid_t p;
 	int wait_status;
-	signal(SIGINT, mask_signal);  
+	signal(SIGINT, mask_signal);	
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Fork And Verify Process
@@ -497,7 +498,7 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	if (p != 0) {
 		if ( waitpid(p, &wait_status, 0) < 0 ) {
 			signal(SIGINT, unmask_signal);
-			fprintf(stderr, "Error with basic command's child  %d. ERRNO\"%d\"\n", p, errno);
+			fprintf(stderr, "Error with basic command's child	%d. ERRNO\"%d\"\n", p, errno);
 			return EXIT_FAILURE;
 		}
 		if ( WIFEXITED(wait_status) && WEXITSTATUS(wait_status) == EXIT_FAILURE )
@@ -511,7 +512,7 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	// Child
 	////////////////////////////////////////////////////////////////////////////////
 	else {
-		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
+		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0	&& errno == 2 ) {
 			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
 			exit(EXIT_FAILURE);
 		}
@@ -539,7 +540,7 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 	pid_t p;
 	int wait_status;
 	int file_desc;
-	signal(SIGINT, mask_signal);  
+	signal(SIGINT, mask_signal);	
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Fork And Verify Process
@@ -555,7 +556,7 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 	////////////////////////////////////////////////////////////////////////////////
 	if (p != 0) {
 		if (waitpid(p, &wait_status, 0) == -1) {
-			fprintf(stderr, "Error with redir command's child  %d. ERRNO\"%d\"\n", p, errno);
+			fprintf(stderr, "Error with redir command's child	%d. ERRNO\"%d\"\n", p, errno);
 			return EXIT_FAILURE;
 		}
 		if ( WIFEXITED(wait_status) && WEXITSTATUS(wait_status) == EXIT_FAILURE )
@@ -606,7 +607,7 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 		cmd->tok[cmd->toklen - 2] = NULL;
 		cmd->toklen = cmd->toklen - 2;
 
-		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
+		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0	&& errno == 2 ) {
 			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
 			exit(EXIT_FAILURE);
 		}
@@ -708,7 +709,7 @@ int exec_backg_command(command_t* cmd, char* envp[])
 			exit(EXIT_FAILURE);
 		}
 
-		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0  && errno == 2 ) {
+		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0	&& errno == 2 ) {
 			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
 			exit(EXIT_FAILURE);
 		}
@@ -720,6 +721,91 @@ int exec_backg_command(command_t* cmd, char* envp[])
 		exit(EXIT_SUCCESS);
 	} 
 	
+}
+
+int iterative_fork_helper (command_t* cmd, int fsi, int fso, char* envp[])
+{
+	pid_t pid;
+
+	if ( !(pid = fork ()) ) {
+		if (fso != 1) {
+			dup2 (fso, STDOUT_FILENO);
+			close (fso);
+		}
+		if (fsi != 0) {
+			dup2 (fsi, STDIN_FILENO);
+			close (fsi);
+		}
+		return execvpe(cmd->tok[0], cmd->tok, envp);
+	}
+	return pid;
+}
+
+
+int exec_pipe_command(command_t* cmd, char* envp[]) {
+	////////////////////////////////////////////////////////////////////////////////
+	// Mask Inturrept Signals and Initialize Variables
+	////////////////////////////////////////////////////////////////////////////////
+	signal(SIGINT, mask_signal);
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Tokenize Piped Command into pieces
+	////////////////////////////////////////////////////////////////////////////////
+	int i = 0, j = 0, k = 0, num_cmds;
+
+	command_t* cmds = malloc(MAX_COMMAND_ARGLEN * sizeof *cmds);
+	cmds[0].tok = malloc( sizeof(char*) * MAX_COMMAND_ARGLEN );
+
+	for (; i < cmd->toklen; i++) {
+		if ( !strcmp(cmd->tok[i], "|") ) {
+			//matches pipe
+			cmds[j].tok[k] = NULL;
+			cmds[j].toklen = k;
+			j++;
+			cmds[j].tok = malloc( sizeof(char*) * MAX_COMMAND_ARGLEN );
+			k = 0;
+		}
+		else {
+			cmds[j].tok[k] = malloc( sizeof(char) * MAX_COMMAND_TITLE );
+			strcpy(cmds[j].tok[k], cmd->tok[i]);
+			//debug printf("cmds[%d]->tok[%d] = %s\n", j, k, cmds[j].tok[k]);
+			k++;
+		}
+	}
+	cmds[j].tok[k] = NULL;
+	cmds[j].toklen = k;
+	num_cmds = j;
+
+//debug
+/*	for (i = 0; i <= num_cmds; i ++) {
+		for (j = 0; j <= cmds[i].toklen; j++) {
+			printf("cmds[%d].tok[%d] = %s\n", i, j, cmds[i].tok[j]);
+		}
+	}*/
+
+	i = 0;
+	j = 0;
+	int fd[2];
+
+	for (i = 0; i < num_cmds - 1; ++i) {
+		if ( pipe(fd) < 0 ) {
+			fprintf(stderr, "\nError in pipe creation. ERRNO:%d\n", errno);
+			return EXIT_FAILURE;
+		}
+		iterative_fork_helper(&cmds[i], j, fd[1], envp);
+		close(fd [1]);
+		j = fd[0];
+	}
+
+	if (j != 0)
+		dup2(j, STDIN_FILENO);
+
+	signal(SIGINT, unmask_signal);
+	if ( execvpe(cmds[i].tok[0], cmds[i].tok, envp) < 0 ) {
+		fprintf(stderr, "Error executing %s. ERRNO\"%d\"\n", cmd->tok[0], errno);
+		exit(EXIT_FAILURE);
+	}
+	return EXIT_SUCCESS;
 }
 
 /**************************************************************************

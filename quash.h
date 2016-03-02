@@ -252,4 +252,6 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[]);
 	*/
 int exec_backg_command(command_t* cmd, char* envp[]);
 
+int exec_pipe_command(command_t* cmd, char* envp[]);
+
 #endif // QUASH_H
