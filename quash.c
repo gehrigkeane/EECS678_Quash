@@ -1,6 +1,9 @@
 /**
  * @file quash.c
  *
+ * Gehrig Keane
+ * Joeseph Champion
+ *
  * Quash's main file
 	*/
 
@@ -100,8 +103,8 @@ void unmask_signal(int signal) {
 void print_cmd_tokens(command_t* cmd) {
 	int i = 0;
 	puts("Struct Token String\n");
-	for (;i <= cmd->toklen; i++)
-		printf ("%d: %s\n", i, cmd->tok[i]);
+	for ( ;i <= cmd->toklen; i++)
+		printf("%d: %s\n", i, cmd->tok[i]);
 }
 
 /**
@@ -109,7 +112,7 @@ void print_cmd_tokens(command_t* cmd) {
 	*/
 void print_init() {
 	char cwd[MAX_COMMAND_LENGTH];	//cwd arg - print before each shell command
-	if ( getcwd(cwd, sizeof(cwd)) && !running_from_file)
+	if ( getcwd(cwd, sizeof(cwd)) && !running_from_file )
 		printf("\n[Quash: %s] q$ ", cwd);
 }
 
@@ -123,11 +126,11 @@ void print_init() {
 void job_handler(int signal, siginfo_t* sig, void* slot) {
 	pid_t p = sig->si_pid;
 	int i = 0;
-	for (; i < num_jobs; ++i) {
-		if (all_jobs[i].pid == p)
+	for ( ; i < num_jobs; ++i) {
+		if ( all_jobs[i].pid == p )
 			break;
 	}
-	if (i < num_jobs) {
+	if ( i < num_jobs ) {
 		printf("\n[%d] %d finished %s\n", all_jobs[i].jid, p, all_jobs[i].cmdstr);
 		all_jobs[i].status = true;
 		free(all_jobs[i].cmdstr);
@@ -144,7 +147,7 @@ int kill_proc(command_t* cmd) {
 	////////////////////////////////////////////////////////////////////////////////
 	// Kill requires 3 arguments
 	////////////////////////////////////////////////////////////////////////////////
-	if (cmd->toklen == 3) {
+	if ( cmd->toklen == 3 ) {
 		int ksignal;
 		sscanf(cmd->tok[1], "%d", &ksignal);
 		int num;
@@ -153,7 +156,7 @@ int kill_proc(command_t* cmd) {
 		////////////////////////////////////////////////////////////////////////////////
 		// Kill provided Job
 		////////////////////////////////////////////////////////////////////////////////
-		if (all_jobs[num].pid)
+		if ( all_jobs[num].pid )
 			kill(all_jobs[num].pid,ksignal); 
 		else {
 			printf("Error: process does not exist \n"); 
@@ -170,6 +173,56 @@ int kill_proc(command_t* cmd) {
 	return EXIT_SUCCESS; 
 }
 
+/**
+	* Creates forks and redirects file streams for use in iterative fashion
+	*
+	* @param cmd command struct
+	* @param fsi file descriptor in
+	* @param fso file descriptor out
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
+int iterative_fork_helper (command_t* cmd, int fsi, int fso, char* envp[])
+{
+	pid_t p;
+
+	if ( !(p = fork ()) ) {
+		////////////////////////////////////////////////////////////////////////////////
+		// Redirect for STDOUT
+		////////////////////////////////////////////////////////////////////////////////
+		if ( fso != 1 ) {
+			if ( dup2(fso, STDOUT_FILENO) < 0 ) {
+				fprintf(stderr, "\nError redirecting STDOUT. ERRNO\"%d\"\n", errno);
+				exit(EXIT_FAILURE);
+			}
+			close (fso);
+		}
+		////////////////////////////////////////////////////////////////////////////////
+		// Redirect for STDIN
+		////////////////////////////////////////////////////////////////////////////////
+		if ( fsi != 0 ) {
+			if ( dup2(fsi, STDIN_FILENO ) < 0) {
+				fprintf(stderr, "\nError redirecting STDIN. ERRNO\"%d\"\n", errno);
+				exit(EXIT_FAILURE);
+			}
+			close (fsi);
+		}
+		////////////////////////////////////////////////////////////////////////////////
+		// Execute Command
+		////////////////////////////////////////////////////////////////////////////////
+		if ( execvpe(cmd->tok[0], cmd->tok, envp) < 0	&& errno == 2 ) {
+			fprintf(stderr, "Command: \"%s\" not found.\n", cmd->tok[0]);
+			exit(EXIT_FAILURE);
+		}
+		else {
+			fprintf(stderr, "Error executing %s. ERRNO\"%d\"\n", cmd->tok[0], errno);
+			exit(EXIT_FAILURE);
+		}
+		return EXIT_SUCCESS;
+	}
+	return p;
+}
+
 /**************************************************************************
  * String Manipulation Functions 
  **************************************************************************/
@@ -182,11 +235,11 @@ int kill_proc(command_t* cmd) {
 	* @return bool successful parse
 	*/
 bool get_command(command_t* cmd, FILE* in) {
-	if (fgets(cmd->cmdstr, MAX_COMMAND_LENGTH, in) != NULL) {
+	if ( fgets(cmd->cmdstr, MAX_COMMAND_LENGTH, in) != NULL ) {
 		size_t len = strlen(cmd->cmdstr);
 		char last_char = cmd->cmdstr[len - 1];
 
-		if (last_char == '\n' || last_char == '\r') {
+		if ( last_char == '\n' || last_char == '\r' ) {
 			// Remove trailing new line character.
 			cmd->cmdstr[len - 1] = '\0';
 			cmd->cmdlen = len - 1;
@@ -197,7 +250,7 @@ bool get_command(command_t* cmd, FILE* in) {
 		////////////////////////////////////////////////////////////////////////////////
 		// Empty Command return true - MUST BE HANDLED
 		////////////////////////////////////////////////////////////////////////////////
-		if (!(int)cmd->cmdlen)
+		if ( !(int)cmd->cmdlen )
 			return true;
 
 		////////////////////////////////////////////////////////////////////////////////
@@ -209,12 +262,12 @@ bool get_command(command_t* cmd, FILE* in) {
 		char* token = malloc( sizeof(char*) * MAX_COMMAND_ARGLEN );
 
 		token = strtok (cmd->cmdstr," ");
-		while (token != NULL)
+		while ( token != NULL )
 		{
 			//debug print - printf ("%d: %s\n", (int)cmd->toklen, token);
 			cmd->tok[cmd->toklen] = token;
 			cmd->toklen++;
-			token = strtok (NULL, " ");
+			token = strtok(NULL, " ");
 		}
 
 		free(token);
@@ -288,8 +341,8 @@ void echo(command_t* cmd)
 void jobs(command_t* cmd) {
 	int i;
 
-	for (i = 0; i < num_jobs; i++) {
-		if (kill(all_jobs[i].pid, 0) == 0 && !all_jobs[i].status) {
+	for ( i = 0; i < num_jobs; i++ ) {
+		if ( kill(all_jobs[i].pid, 0) == 0 && !all_jobs[i].status ) {
 			printf("[%d] %d %s \n", all_jobs[i].jid, all_jobs[i].pid, all_jobs[i].cmdstr);
 		}
 	}
@@ -305,27 +358,26 @@ void jobs(command_t* cmd) {
 	* @return void
 	*/
 void set(command_t* cmd) {
-	if (cmd->tok[1] == NULL) {
+	if ( cmd->tok[1] == NULL )
 		printf("set: No command given\n");
-	}
 	else {
 		// Get the environment variable and directory
 		// (Delimited by '=')
 		char* env = strtok(cmd->tok[1], "=");
 		char* dir = strtok(NULL, "=");
 
-		if (env == NULL || dir == NULL) {
+		if ( env == NULL || dir == NULL ) {
 			printf("set: Incorrect syntax. Possible Usages:\n");
 			printf("\tset PATH=/directory/to/use/for/path\n");
 			printf("\tset HOME=/directory/to/use/for/home\n");
 		}
-		else if (!strcmp(env, "PATH") || !strcmp(env, "HOME")) {
-			// Set the environment variable
+		////////////////////////////////////////////////////////////////////////////////
+		// Set the environment variable
+		////////////////////////////////////////////////////////////////////////////////
+		else if ( !strcmp(env, "PATH") || !strcmp(env, "HOME") )
 			setenv(env, dir, 1);
-		}
-		else {
+		else
 			printf("set: available only for PATH or HOME environment variables\n");
-		}
 	}
 }
 
@@ -379,34 +431,27 @@ void run_quash(command_t* cmd, char** envp) {
 	////////////////////////////////////////////////////////////////////////////////
 	// Command Decision Structure
 	////////////////////////////////////////////////////////////////////////////////
-	if (!strcmp(cmd->cmdstr, "exit") || !strcmp(cmd->cmdstr, "quit")) {
+	if ( !strcmp(cmd->cmdstr, "exit") || !strcmp(cmd->cmdstr, "quit") )
 		terminate(); // Exit Quash
-	}
-	else if (!cmd->cmdlen) {
-		// Do nothing -- just print the cwd to display we're still in the shell.
-	}
-	else if (strcmp(cmd->tok[0], "cd") == 0) {
+	////////////////////////////////////////////////////////////////////////////////
+	// Do nothing -- just print the cwd to display we're still in the shell.
+	////////////////////////////////////////////////////////////////////////////////
+	else if ( !cmd->cmdlen ) {}
+	else if ( strcmp(cmd->tok[0], "cd") == 0 )
 		cd(cmd);
-	}
-	else if (strcmp(cmd->tok[0], "echo") == 0) {
+	else if ( strcmp(cmd->tok[0], "echo") == 0 )
 		echo(cmd);
-	}
-	else if (!strcmp(cmd->tok[0], "jobs")) {
+	else if ( !strcmp(cmd->tok[0], "jobs") )
 		jobs(cmd);
-	}
-	else if (!strcmp(cmd->tok[0], "kill")) {
+	else if ( !strcmp(cmd->tok[0], "kill") )
 		kill_proc(cmd);
-	}
-	else if (!strcmp(cmd->tok[0], "set")) {
+	else if ( !strcmp(cmd->tok[0], "set") )
 		set(cmd);
-	}
-	else {
+	else
 		exec_command(cmd, envp);
-	}
 
-	if (running) {
+	if ( running )
 		print_init();
-	}
 }
 
 /**
@@ -451,19 +496,14 @@ int exec_command(command_t* cmd, char* envp[])
 		cmd->toklen--;
 		RETURN_CODE = exec_backg_command(cmd, envp);
 	} 
-	else if ( i_bool ) {
+	else if ( i_bool )
 		RETURN_CODE = exec_redir_command(cmd, true, envp);
-	}
-	else if ( o_bool ) {
+	else if ( o_bool )
 		RETURN_CODE = exec_redir_command(cmd, false, envp);
-	}
-	else if ( p_bool ) {
+	else if ( p_bool )
 		RETURN_CODE = exec_pipe_command(cmd, envp);
-		printf("Pipe return code: %d", RETURN_CODE);
-	}
-	else {
+	else
 		RETURN_CODE = exec_basic_command(cmd, envp);
-	}
 	return RETURN_CODE;
 }
 
@@ -487,7 +527,7 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	// Fork And Verify Process
 	////////////////////////////////////////////////////////////////////////////////
 	p = fork();
-	if (p < 0) {
+	if ( p < 0 ) {
 		fprintf(stderr, "Error forking basic command. Error:%d\n", errno);
 		exit(EXIT_FAILURE);
 	}
@@ -495,7 +535,7 @@ int exec_basic_command(command_t* cmd, char* envp[])
 	////////////////////////////////////////////////////////////////////////////////
 	// Parent
 	////////////////////////////////////////////////////////////////////////////////
-	if (p != 0) {
+	if ( p != 0 ) {
 		if ( waitpid(p, &wait_status, 0) < 0 ) {
 			signal(SIGINT, unmask_signal);
 			fprintf(stderr, "Error with basic command's child	%d. ERRNO\"%d\"\n", p, errno);
@@ -503,7 +543,6 @@ int exec_basic_command(command_t* cmd, char* envp[])
 		}
 		if ( WIFEXITED(wait_status) && WEXITSTATUS(wait_status) == EXIT_FAILURE )
 			return EXIT_FAILURE;
-
 		signal(SIGINT, unmask_signal);
 		return EXIT_SUCCESS;
 	}
@@ -546,7 +585,7 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 	// Fork And Verify Process
 	////////////////////////////////////////////////////////////////////////////////
 	p = fork();
-	if (p < 0) {
+	if ( p < 0 ) {
 		fprintf(stderr, "Error forking redir command. ERRNO\"%d\"\n", errno);
 		exit(EXIT_FAILURE);
 	}
@@ -554,7 +593,7 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 	////////////////////////////////////////////////////////////////////////////////
 	// Parent
 	////////////////////////////////////////////////////////////////////////////////
-	if (p != 0) {
+	if ( p != 0 ) {
 		if (waitpid(p, &wait_status, 0) == -1) {
 			fprintf(stderr, "Error with redir command's child	%d. ERRNO\"%d\"\n", p, errno);
 			return EXIT_FAILURE;
@@ -573,12 +612,12 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 		////////////////////////////////////////////////////////////////////////////////
 		// Initialize and Verify File Descriptor
 		////////////////////////////////////////////////////////////////////////////////
-		if (io)
+		if ( io )
 			file_desc = open(cmd->tok[cmd->toklen - 1], O_RDONLY, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 		else
 			file_desc = open(cmd->tok[cmd->toklen - 1], O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
-		if (file_desc < 0) {
+		if ( file_desc < 0 ) {
 			fprintf(stderr, "\nError opening %s. ERRNO\"%d\"\n", cmd->tok[cmd->toklen - 1], errno);
 			exit(EXIT_FAILURE);
 		}
@@ -586,7 +625,7 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[])
 		////////////////////////////////////////////////////////////////////////////////
 		// Redirect I/O Streams
 		////////////////////////////////////////////////////////////////////////////////
-		if (io) {
+		if ( io ) {
 			if (dup2(file_desc, STDIN_FILENO) < 0) {
 				fprintf(stderr, "\nError redirecting STDIN to %s. ERRNO\"%d\"\n", cmd->tok[cmd->toklen - 1], errno);
 				exit(EXIT_FAILURE);
@@ -639,7 +678,7 @@ int exec_backg_command(command_t* cmd, char* envp[])
 	struct sigaction action;
 	action.sa_sigaction = *job_handler;
 	action.sa_flags = SA_SIGINFO | SA_RESTART;
-	if (sigaction(SIGCHLD, &action, NULL) < 0)
+	if ( sigaction(SIGCHLD, &action, NULL) < 0 )
 		fprintf(stderr, "Error background signal handler: ERRNO\"%d\"\n", errno);
 	sigprocmask(SIG_BLOCK, &sigmask_1, &sigmask_2);
 
@@ -647,7 +686,7 @@ int exec_backg_command(command_t* cmd, char* envp[])
 	// Fork And Verify Process
 	////////////////////////////////////////////////////////////////////////////////
 	p = fork();
-	if (p < 0) {
+	if ( p < 0 ) {
 		fprintf(stderr, "\nError forking background command. ERRNO\"%d\"\n", errno);
 		exit(EXIT_FAILURE);
 	}
@@ -655,7 +694,7 @@ int exec_backg_command(command_t* cmd, char* envp[])
 	////////////////////////////////////////////////////////////////////////////////
 	// Parent
 	////////////////////////////////////////////////////////////////////////////////
-	if (p != 0) {
+	if ( p != 0 ) {
 		////////////////////////////////////////////////////////////////////////////////
 		// Populate new job struct
 		////////////////////////////////////////////////////////////////////////////////
@@ -699,12 +738,12 @@ int exec_backg_command(command_t* cmd, char* envp[])
 
 		file_desc = open(temp_file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 		
-		if (file_desc < 0) {
+		if ( file_desc < 0 ) {
 			fprintf(stderr, "\nError opening %s. ERRNO\"%d\"\n", temp_file, errno);
 			exit(EXIT_FAILURE);
 		}
 
-		if (dup2(file_desc, STDOUT_FILENO) < 0) {
+		if ( dup2(file_desc, STDOUT_FILENO) < 0 ) {
 			fprintf(stderr, "\nError redirecting STDOUT to %s. ERRNO\"%d\"\n", temp_file, errno);
 			exit(EXIT_FAILURE);
 		}
@@ -723,28 +762,16 @@ int exec_backg_command(command_t* cmd, char* envp[])
 	
 }
 
-int iterative_fork_helper (command_t* cmd, int fsi, int fso, char* envp[])
-{
-	pid_t pid;
-
-	if ( !(pid = fork ()) ) {
-		if (fso != 1) {
-			dup2 (fso, STDOUT_FILENO);
-			close (fso);
-		}
-		if (fsi != 0) {
-			dup2 (fsi, STDIN_FILENO);
-			close (fsi);
-		}
-		return execvpe(cmd->tok[0], cmd->tok, envp);
-	}
-	return pid;
-}
-
-
+/**
+	* Executes any command with an | present
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
 int exec_pipe_command(command_t* cmd, char* envp[]) {
 	////////////////////////////////////////////////////////////////////////////////
-	// Mask Inturrept Signals and Initialize Variables
+	// Mask Inturrept Signals
 	////////////////////////////////////////////////////////////////////////////////
 	signal(SIGINT, mask_signal);
 
@@ -752,11 +779,10 @@ int exec_pipe_command(command_t* cmd, char* envp[]) {
 	// Tokenize Piped Command into pieces
 	////////////////////////////////////////////////////////////////////////////////
 	int i = 0, j = 0, k = 0, num_cmds;
-
 	command_t* cmds = malloc(MAX_COMMAND_ARGLEN * sizeof *cmds);
 	cmds[0].tok = malloc( sizeof(char*) * MAX_COMMAND_ARGLEN );
 
-	for (; i < cmd->toklen; i++) {
+	for ( ; i < cmd->toklen; i++ ) {
 		if ( !strcmp(cmd->tok[i], "|") ) {
 			//matches pipe
 			cmds[j].tok[k] = NULL;
@@ -785,26 +811,32 @@ int exec_pipe_command(command_t* cmd, char* envp[]) {
 
 	i = 0;
 	j = 0;
-	int fd[2];
+	int file_desc[2];
 
-	for (i = 0; i < num_cmds - 1; ++i) {
-		if ( pipe(fd) < 0 ) {
+	////////////////////////////////////////////////////////////////////////////////
+	// Create and link pipes 
+	////////////////////////////////////////////////////////////////////////////////
+	for ( i = 0; i < num_cmds - 1; ++i ) {
+		if ( pipe(file_desc) < 0 ) {
 			fprintf(stderr, "\nError in pipe creation. ERRNO:%d\n", errno);
 			return EXIT_FAILURE;
 		}
-		iterative_fork_helper(&cmds[i], j, fd[1], envp);
-		close(fd [1]);
-		j = fd[0];
+		iterative_fork_helper(&cmds[i], j, file_desc[1], envp);
+		close(file_desc [1]);
+		j = file_desc[0];
 	}
 
-	if (j != 0)
+	if ( j != 0 )
 		dup2(j, STDIN_FILENO);
 
-	signal(SIGINT, unmask_signal);
+	////////////////////////////////////////////////////////////////////////////////
+	// Execute final command
+	////////////////////////////////////////////////////////////////////////////////
 	if ( execvpe(cmds[i].tok[0], cmds[i].tok, envp) < 0 ) {
 		fprintf(stderr, "Error executing %s. ERRNO\"%d\"\n", cmd->tok[0], errno);
 		exit(EXIT_FAILURE);
 	}
+	signal(SIGINT, unmask_signal);
 	return EXIT_SUCCESS;
 }
 
@@ -848,7 +880,7 @@ int main(int argc, char** argv, char** envp) {
 	////////////////////////////////////////////////////////////////////////////////
 	// Main Execution Loop
 	////////////////////////////////////////////////////////////////////////////////
-	while (is_running() && get_command(&cmd, stdin)) {
+	while ( is_running() && get_command(&cmd, stdin) ) {
 		run_quash(&cmd, envp);
 	}
 

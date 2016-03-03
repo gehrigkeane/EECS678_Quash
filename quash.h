@@ -1,6 +1,9 @@
 /**
 	* @file quash.h
 	*
+	* Gehrig Keane
+	* Joeseph Champion
+	*
 	* Quash essential functions and structures.
 	*/
 
@@ -44,15 +47,14 @@
 	* Holds information about a command.
 	*/
 typedef struct command_t {
-		char** tok;							///< tokenized command array
-		char cmdstr[MAX_COMMAND_LENGTH];	///< character buffer to store the
-											///< command string. You may want
-											///< to modify this to accept
-											///< arbitrarily long strings for
-											///< robustness.
-		size_t cmdlen;						///< length of the cmdstr character buffer
-		size_t toklen;						///< tokenized command array length
-		// Extend with more fields if needed
+	char** tok;							///< tokenized command array
+	char cmdstr[MAX_COMMAND_LENGTH];	///< character buffer to store the
+										///< command string. You may want
+										///< to modify this to accept
+										///< arbitrarily long strings for
+										///< robustness.
+	size_t cmdlen;						///< length of the cmdstr character buffer
+	size_t toklen;						///< tokenized command array length
 } command_t;
 
 /**
@@ -140,6 +142,17 @@ void job_handler(int signal, siginfo_t* sig, void* slot);
 	* @return: RETURN_CODE
 */
 int kill_proc(command_t* cmd);
+
+/**
+	* Creates forks and redirects file streams for use in iterative fashion
+	*
+	* @param cmd command struct
+	* @param fsi file descriptor in
+	* @param fso file descriptor out
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
+int iterative_fork_helper (command_t* cmd, int fsi, int fso, char* envp[]);
 
 /**************************************************************************
  * String Manipulation Functions 
@@ -252,6 +265,13 @@ int exec_redir_command(command_t* cmd, bool io, char* envp[]);
 	*/
 int exec_backg_command(command_t* cmd, char* envp[]);
 
+/**
+	* Executes any command with an | present
+	*
+	* @param cmd command struct
+	* @param envp environment variables
+	* @return RETURN_CODE
+	*/
 int exec_pipe_command(command_t* cmd, char* envp[]);
 
 #endif // QUASH_H
